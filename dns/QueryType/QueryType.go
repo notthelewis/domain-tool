@@ -1,32 +1,30 @@
 package QueryType
 
-import "errors"
-
 type QueryType uint16
 
-func New(qtype string) (QueryType, error) {
+func New(qtype string) QueryType {
 	switch qtype {
 	case "A":
-		return A, nil
+		return A
 
 	case "NS":
-		return NS, nil
+		return NS
 
 	case "CNAME":
-		return CNAME, nil
+		return CNAME
 
 	case "PTR":
-		return PTR, nil
+		return PTR 
 
 	case "MX":
-		return MX, nil
+		return MX
 
 	case "ANY":
-		return ANY, nil
+		return ANY
 
 		// TODO: Add em all
 	default:
-		return 0, errors.New("unknown query type")
+		panic("unknown query type")
 	}
 }
 
