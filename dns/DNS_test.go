@@ -1,11 +1,11 @@
 package dns
 
 import (
-	"strconv"
+	"bytes"
 	"testing"
 )
 
-func TestToggleBit(t *testing.T) {
+func TestFlagEncode(t *testing.T) {
     df := DNSFlags{
         QR:  true,
         OpCode: 4,
@@ -16,6 +16,17 @@ func TestToggleBit(t *testing.T) {
         Rcode: 2,
     }
 
-    t.Log(df)
-    t.Log(strconv.FormatInt(int64(df.Encode()), 2))
+    if df.Encode() != 0b1010010100000010 {
+        t.Fatal("bad encoding for flags")
+    }
+}
+
+func TestLabelEncode(t *testing.T) {
+    l := Label{
+        Name: []byte("test"),
+    }
+
+    if !bytes.Equal(l.Encode(), []byte{4, 't', 'e', 's', 't'}) {
+        t.Fatalf("bad encoding for label")
+    }
 }
