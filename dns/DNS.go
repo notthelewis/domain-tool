@@ -17,6 +17,7 @@ type DNSMessage struct {
 	AdditionalInformation []ResourceRecord
 }
 
+// Encode a DNS message into a byte slice into the expected format. 
 func (dnsMsg *DNSMessage) Encode() []byte {
 	header := make([]byte, 0, 12)
 
@@ -72,6 +73,19 @@ type DNSQuestion struct {
 	QueryName  []Label
 	QueryType  qt.QueryType
 	QueryClass uint16
+}
+
+func (Q DNSQuestion) Encode() {
+    // This is imperfect, as a reslice could happen if every label is max length... 
+    // though that reslice is such a rare occurance that this is a viable trade off.
+    // another downside is that this will probably overalloc, though the numbers are so small it doesn't actually matter
+    buf := make([]byte, 0, 63 * len(Q.QueryName) + 4)
+    for _, l := range Q.QueryName {
+        buf = append(buf, l.Encode()...)
+    }
+    buf = append(buf, 0)
+    binary.BigEndian.PutUint16(buf, Q.QueryType.Get())
+    binary.BigEndian.PutUint16(buf, Q.QueryClass)
 }
 
 // Label is part of a domain, i.e. in `test.com`, `test` and `com` are labels
