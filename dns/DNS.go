@@ -17,16 +17,16 @@ type DNSMessage struct {
 	AdditionalInformation []ResourceRecord
 }
 
-// Encode a DNS message into a byte slice into the expected format. 
+// Encode a DNS message into a byte slice into the expected format.
 func (dnsMsg *DNSMessage) Encode() []byte {
 	header := make([]byte, 0, 12)
 
-    qLen := len(dnsMsg.Questions)
-    anLen := len(dnsMsg.Answers)
-    auLen := len(dnsMsg.Authority)
-    adLen := len(dnsMsg.AdditionalInformation)
-    // bodyLen := qLen + anLen + auLen + adLen
-    // body := make([]byte, 0, bodyLen)
+	qLen := len(dnsMsg.Questions)
+	anLen := len(dnsMsg.Answers)
+	auLen := len(dnsMsg.Authority)
+	adLen := len(dnsMsg.AdditionalInformation)
+	// bodyLen := qLen + anLen + auLen + adLen
+	// body := make([]byte, 0, bodyLen)
 
 	// Write Identification
 	binary.BigEndian.PutUint16(header, uint16(rand.UintN(0xFFFF)))
@@ -40,10 +40,9 @@ func (dnsMsg *DNSMessage) Encode() []byte {
 	binary.BigEndian.PutUint16(header, uint16(auLen))
 	binary.BigEndian.PutUint16(header, uint16(adLen))
 
-
-    // for _, r := range dnsMsg.Questions {
-    //
-    // }
+	// for _, r := range dnsMsg.Questions {
+	//
+	// }
 
 	return header
 }
@@ -76,36 +75,36 @@ type DNSQuestion struct {
 }
 
 func (Q DNSQuestion) Encode() {
-    // This is imperfect, as a reslice could happen if every label is max length... 
-    // though that reslice is such a rare occurance that this is a viable trade off.
-    // another downside is that this will probably overalloc, though the numbers are so small it doesn't actually matter
-    buf := make([]byte, 0, 63 * len(Q.QueryName) + 4)
-    for _, l := range Q.QueryName {
-        buf = append(buf, l.Encode()...)
-    }
-    buf = append(buf, 0)
-    binary.BigEndian.PutUint16(buf, Q.QueryType.Get())
-    binary.BigEndian.PutUint16(buf, Q.QueryClass)
+	// This is imperfect, as a reslice could happen if every label is max length...
+	// though that reslice is such a rare occurance that this is a viable trade off.
+	// another downside is that this will probably overalloc, though the numbers are so small it doesn't actually matter
+	buf := make([]byte, 0, 63*len(Q.QueryName)+4)
+	for _, l := range Q.QueryName {
+		buf = append(buf, l.Encode()...)
+	}
+	buf = append(buf, 0)
+	binary.BigEndian.PutUint16(buf, Q.QueryType.Get())
+	binary.BigEndian.PutUint16(buf, Q.QueryClass)
 }
 
 // Label is part of a domain, i.e. in `test.com`, `test` and `com` are labels
 type Label struct {
-	Name  []byte
+	Name []byte
 }
 
 // Encode will take in a label and encode it into a byte slice in the format required by DNS protocol.
-// The format is a length-prepended, variable length byte array. 
+// The format is a length-prepended, variable length byte array.
 // I.e. `test.com` will be encoded as two separate labels: `4test`, `3com`
 func (L *Label) Encode() []byte {
-    if len(L.Name) > 63 {
-        panic("Max length of 63 for label exceeded")
-    }
+	if len(L.Name) > 63 {
+		panic("Max length of 63 for label exceeded")
+	}
 
-    buf := make([]byte, 0, len(L.Name)+1)
-    buf = append(buf, uint8(len(L.Name)))
-    buf = append(buf, L.Name...)
+	buf := make([]byte, 0, len(L.Name)+1)
+	buf = append(buf, uint8(len(L.Name)))
+	buf = append(buf, L.Name...)
 
-    return buf
+	return buf
 }
 
 // ResourceRecord is used for server responses to questions
@@ -114,8 +113,28 @@ type ResourceRecord struct {
 	Type               qt.QueryType
 	Class              uint16
 	TTL                uint16
-	ResourceDataLength []byte
+	ResourceDataLength uint16
 	ResourceData       []byte
+}
+
+func (R *ResourceRecord) Encode() []byte {
+	buf := make([]byte, 0)
+
+	for _, dn := range R.DomainName {
+		buf = append(buf, dn.Encode()...)
+	}
+
+	// Label terminate
+	buf = append(buf, 0x00)
+
+	buf = binary.BigEndian.AppendUint16(buf, R.Type.Get())
+	buf = binary.BigEndian.AppendUint16(buf, R.Class)
+	buf = binary.BigEndian.AppendUint16(buf, R.TTL)
+	buf = binary.BigEndian.AppendUint16(buf, R.ResourceDataLength)
+
+	buf = append(buf, R.ResourceData...)
+
+	return buf
 }
 
 // b2i converts a bool to integer
