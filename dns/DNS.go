@@ -9,7 +9,6 @@ import (
 
 // DNSMessage is the fundamental interchange format between client and server.
 type DNSMessage struct {
-	Identification        uint16   // ID number decided by the client, which is repeated by the server upon response
 	Flags                 DNSFlags // Message specific flags set dependent on use case
 	Questions             []DNSQuestion
 	Answers               []ResourceRecord
@@ -25,24 +24,28 @@ func (dnsMsg *DNSMessage) Encode() []byte {
 	anLen := len(dnsMsg.Answers)
 	auLen := len(dnsMsg.Authority)
 	adLen := len(dnsMsg.AdditionalInformation)
-	// bodyLen := qLen + anLen + auLen + adLen
-	// body := make([]byte, 0, bodyLen)
+
+    // Almost completely arbitrary in terms of pre-alloc, though it's better than the Go standard
+    // TODO: Prove the above is true :')
+	bodyLen := (qLen + anLen + auLen + adLen) * 64
+	body := make([]byte, 0, bodyLen)
 
 	// Write Identification
-	binary.BigEndian.PutUint16(header, uint16(rand.UintN(0xFFFF)))
+	header = binary.BigEndian.AppendUint16(header, uint16(rand.UintN(0xFFFF)))
 
 	// Write Flags
-	binary.BigEndian.PutUint16(header, dnsMsg.Flags.Encode())
+	header = binary.BigEndian.AppendUint16(header, dnsMsg.Flags.Encode())
 
-	// Write varint fields
-	binary.BigEndian.PutUint16(header, uint16(qLen))
-	binary.BigEndian.PutUint16(header, uint16(anLen))
-	binary.BigEndian.PutUint16(header, uint16(auLen))
-	binary.BigEndian.PutUint16(header, uint16(adLen))
+	// Write variable int fields
+	header = binary.BigEndian.AppendUint16(header, uint16(qLen))
+	header = binary.BigEndian.AppendUint16(header, uint16(anLen))
+	header = binary.BigEndian.AppendUint16(header, uint16(auLen))
+	header = binary.BigEndian.AppendUint16(header, uint16(adLen))
 
-	// for _, r := range dnsMsg.Questions {
-	//
-	// }
+    // Write body 
+	for _, r := range dnsMsg.Questions {
+        body = append(body, r.Encode()...)
+	}
 
 	return header
 }
@@ -60,7 +63,7 @@ type DNSFlags struct {
 
 // Encode will take a DNSFlags and encode it as a single uint16
 func (F *DNSFlags) Encode() uint16 {
-	return uint16((b2i(F.QR)<<7|int(F.OpCode)<<3|b2i(F.AA)<<2|b2i(F.RD))<<8 | b2i(F.RA)<<7 | 0x00<<4 | int(F.Rcode))
+    return uint16((b2i(F.QR)<<7|int(F.OpCode)<<3|b2i(F.AA)<<2|b2i(F.RD))<<8 | b2i(F.RA)<<7 | 0x00<<4 | int(F.Rcode))
 }
 
 func (F DNSFlags) String() string {
@@ -74,7 +77,7 @@ type DNSQuestion struct {
 	QueryClass uint16
 }
 
-func (Q DNSQuestion) Encode() {
+func (Q DNSQuestion) Encode() []byte {
 	// This is imperfect, as a reslice could happen if every label is max length...
 	// though that reslice is such a rare occurance that this is a viable trade off.
 	// another downside is that this will probably overalloc, though the numbers are so small it doesn't actually matter
@@ -83,8 +86,10 @@ func (Q DNSQuestion) Encode() {
 		buf = append(buf, l.Encode()...)
 	}
 	buf = append(buf, 0)
-	binary.BigEndian.PutUint16(buf, Q.QueryType.Get())
-	binary.BigEndian.PutUint16(buf, Q.QueryClass)
+	buf = binary.BigEndian.AppendUint16(buf, Q.QueryType.Get())
+	buf = binary.BigEndian.AppendUint16(buf, Q.QueryClass)
+
+    return buf
 }
 
 // Label is part of a domain, i.e. in `test.com`, `test` and `com` are labels
